@@ -1,3 +1,26 @@
+/*
+Package order provides order management, execution tracking, and trading result analysis.
+
+Core Components:
+  • Order Controller - Central order execution and lifecycle management
+  • Order Feed - Event distribution system for order status updates  
+  • Trading Results - Comprehensive performance analysis and statistics
+  • Summary Analysis - Win/loss tracking, profit calculation, and metrics
+
+Key Features:
+  • Multi-exchange order routing and execution
+  • Real-time order status tracking and notifications
+  • Advanced trading statistics (SQN, Payoff, Profit Factor)
+  • Support for both live trading and backtesting scenarios
+  • Thread-safe concurrent order processing
+
+Performance Metrics:
+  • System Quality Number (SQN) for strategy evaluation
+  • Payoff ratio analysis (average win / average loss)
+  • Profit factor calculation (gross profit / gross loss)
+  • Win/loss percentage and trade frequency analysis
+  • Bootstrap confidence intervals for statistical validation
+*/
 package order
 
 import (
@@ -19,35 +42,69 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// ═══════════════════════════════════════════════════════════════════
+// Trading Performance Analysis Types
+// ═══════════════════════════════════════════════════════════════════
+
+/*
+summary contains comprehensive trading performance statistics for a specific trading pair.
+
+Statistical Categories:
+  • Win Trades: Profitable trades separated by long/short positions
+  • Lose Trades: Unprofitable trades separated by long/short positions  
+  • Percentage Returns: Normalized returns for statistical analysis
+  • Volume: Total trading volume for the pair
+
+Long vs Short Separation:
+  • Long positions: Buy first, sell later (profit from price increases)
+  • Short positions: Sell first, buy later (profit from price decreases)
+  • Separate tracking enables strategy analysis and risk assessment
+
+Data Structure Design:
+  • Slices store individual trade results for detailed analysis
+  • Percentage returns enable normalized comparison across assets
+  • Volume tracking supports position sizing analysis
+*/
 type summary struct {
-	Pair             string
-	WinLong          []float64
-	WinLongPercent   []float64
-	WinShort         []float64
-	WinShortPercent  []float64
-	LoseLong         []float64
-	LoseLongPercent  []float64
-	LoseShort        []float64
-	LoseShortPercent []float64
-	Volume           float64
+	Pair             string    // Trading pair identifier (e.g., "BTC/USDT")
+	
+	// Long Position Results
+	WinLong          []float64 // Profitable long trades (absolute values)
+	WinLongPercent   []float64 // Profitable long trades (percentage returns)
+	LoseLong         []float64 // Unprofitable long trades (absolute values)
+	LoseLongPercent  []float64 // Unprofitable long trades (percentage returns)
+	
+	// Short Position Results  
+	WinShort         []float64 // Profitable short trades (absolute values)
+	WinShortPercent  []float64 // Profitable short trades (percentage returns)
+	LoseShort        []float64 // Unprofitable short trades (absolute values)
+	LoseShortPercent []float64 // Unprofitable short trades (percentage returns)
+	
+	// Trading Volume
+	Volume           float64   // Total trading volume for this pair
 }
 
+// Win returns all winning trades combining both long and short positions.
 func (s summary) Win() []float64 {
 	return append(s.WinLong, s.WinShort...)
 }
 
+// WinPercent returns all winning trade percentages combining both long and short positions.
 func (s summary) WinPercent() []float64 {
 	return append(s.WinLongPercent, s.WinShortPercent...)
 }
 
+// Lose returns all losing trades combining both long and short positions.
 func (s summary) Lose() []float64 {
 	return append(s.LoseLong, s.LoseShort...)
 }
 
+// LosePercent returns all losing trade percentages combining both long and short positions.
 func (s summary) LosePercent() []float64 {
 	return append(s.LoseLongPercent, s.LoseShortPercent...)
 }
 
+// Profit calculates the total profit/loss by summing all winning and losing trades.
 func (s summary) Profit() float64 {
 	profit := 0.0
 	for _, value := range append(s.Win(), s.Lose()...) {
@@ -56,6 +113,8 @@ func (s summary) Profit() float64 {
 	return profit
 }
 
+// SQN calculates the System Quality Number, a measure of trading system quality
+// that considers both profitability and consistency. Higher values indicate better systems.
 func (s summary) SQN() float64 {
 	total := float64(len(s.Win()) + len(s.Lose()))
 	avgProfit := s.Profit() / total
@@ -67,6 +126,8 @@ func (s summary) SQN() float64 {
 	return math.Sqrt(total) * (s.Profit() / total) / stdDev
 }
 
+// Payoff calculates the average winning trade divided by the average losing trade.
+// Values greater than 1 indicate that wins are larger than losses on average.
 func (s summary) Payoff() float64 {
 	avgWin := 0.0
 	avgLose := 0.0

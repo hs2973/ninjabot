@@ -1,10 +1,14 @@
+// Package indicator provides a comprehensive wrapper around the TA-Lib technical analysis library.
+// It offers access to a wide range of technical indicators including moving averages, oscillators,
+// momentum indicators, volatility measures, and mathematical transforms for trading strategy development.
 package indicator
 
 import "github.com/markcheno/go-talib"
 
+// MaType is an alias for the TA-Lib moving average type
 type MaType = talib.MaType
 
-// Kinds of moving averages
+// Moving average types supported by TA-Lib
 const (
 	TypeSMA   = talib.SMA
 	TypeEMA   = talib.EMA

@@ -1,3 +1,6 @@
+// Package main demonstrates backtesting functionality using the ninjabot framework.
+// This example shows how to set up historical data analysis, strategy testing,
+// and performance visualization using CSV data feeds and chart generation.
 package main
 
 import (

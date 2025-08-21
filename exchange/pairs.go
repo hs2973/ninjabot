@@ -11,17 +11,20 @@ import (
 	"github.com/adshao/go-binance/v2/futures"
 )
 
+// AssetQuote represents the asset and quote currency components of a trading pair.
 type AssetQuote struct {
 	Quote string
 	Asset string
 }
 
+// Trading pair mappings and embedded data
 var (
 	//go:embed pairs.json
 	pairs             []byte
 	pairAssetQuoteMap = make(map[string]AssetQuote)
 )
 
+// init loads the embedded trading pairs data into the asset-quote mapping.
 func init() {
 	err := json.Unmarshal(pairs, &pairAssetQuoteMap)
 	if err != nil {

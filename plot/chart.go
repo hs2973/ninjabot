@@ -1,3 +1,6 @@
+// Package plot provides charting and visualization capabilities for trading bot analysis.
+// It generates interactive web-based charts displaying candle data, trading orders,
+// indicators, and performance metrics for backtesting and live trading visualization.
 package plot
 
 import (
@@ -22,11 +25,14 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// Embedded static files for the web interface
 var (
 	//go:embed assets
 	staticFiles embed.FS
 )
 
+// Chart provides functionality for generating and serving interactive trading charts
+// with support for candle visualization, order tracking, and indicator display.
 type Chart struct {
 	sync.Mutex
 	port            int

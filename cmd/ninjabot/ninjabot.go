@@ -1,3 +1,6 @@
+// Package main provides the command-line interface for the ninjabot trading framework.
+// It includes utilities for downloading historical market data and other bot management tasks.
+// The CLI supports various exchanges and timeframes for data acquisition and backtesting preparation.
 package main
 
 import (
@@ -11,6 +14,8 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+// main initializes and runs the ninjabot command-line application with support
+// for downloading historical market data from various cryptocurrency exchanges.
 func main() {
 	app := &cli.App{
 		Name:     "ninjabot",

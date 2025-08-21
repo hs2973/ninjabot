@@ -16,34 +16,59 @@ import (
 	"github.com/rodrigo-brito/ninjabot/tools/log"
 )
 
+// assetInfo tracks the available and locked balances for a specific asset in the paper wallet.
 type assetInfo struct {
-	Free float64
-	Lock float64
+	Free float64  // Available balance for trading
+	Lock float64  // Balance locked in pending orders
 }
 
+// AssetValue represents a timestamped value record for tracking asset performance over time.
 type AssetValue struct {
-	Time  time.Time
-	Value float64
+	Time  time.Time  // Timestamp of the value record
+	Value float64    // Asset value at the given time
 }
 
+/*
+PaperWallet implements a realistic trading simulation that mimics real exchange behavior
+without using actual funds. It maintains virtual balances, processes orders with proper
+validation, applies trading fees, and tracks comprehensive performance metrics.
+
+Core Features:
+  • Realistic order execution with market impact simulation
+  • Complete balance management with locked/available funds tracking
+  • Trading fee calculation (maker/taker fees)
+  • Position tracking for long/short strategies
+  • Comprehensive performance analytics and equity curve tracking
+  • Volume and average price calculations
+  • Support for all standard order types (market, limit, stop-loss, OCO)
+
+Risk Management:
+  • Insufficient balance validation
+  • Order size constraints
+  • Realistic slippage simulation
+  • Proper order state management
+
+The PaperWallet is thread-safe and suitable for both backtesting historical data
+and live paper trading with real-time market feeds.
+*/
 type PaperWallet struct {
-	sync.Mutex
-	ctx           context.Context
-	baseCoin      string
-	counter       int64
-	takerFee      float64
-	makerFee      float64
-	initialValue  float64
-	feeder        service.Feeder
-	orders        []model.Order
-	assets        map[string]*assetInfo
-	avgShortPrice map[string]float64
-	avgLongPrice  map[string]float64
-	volume        map[string]float64
-	lastCandle    map[string]model.Candle
-	fistCandle    map[string]model.Candle
-	assetValues   map[string][]AssetValue
-	equityValues  []AssetValue
+	sync.Mutex                          // Thread-safe access to all fields
+	ctx           context.Context       // Request context for operations
+	baseCoin      string               // Base currency for portfolio valuation (e.g., "USDT")
+	counter       int64                // Order ID counter for unique identification
+	takerFee      float64              // Fee rate for market orders (taking liquidity)
+	makerFee      float64              // Fee rate for limit orders (making liquidity)
+	initialValue  float64              // Starting portfolio value for performance calculation
+	feeder        service.Feeder       // Market data source for price information
+	orders        []model.Order        // Complete order history
+	assets        map[string]*assetInfo // Asset balances by symbol
+	avgShortPrice map[string]float64   // Average short position prices by pair
+	avgLongPrice  map[string]float64   // Average long position prices by pair
+	volume        map[string]float64   // Trading volume by pair
+	lastCandle    map[string]model.Candle // Most recent candle for each pair
+	fistCandle    map[string]model.Candle // First candle for each pair (performance baseline)
+	assetValues   map[string][]AssetValue // Historical value tracking per asset
+	equityValues  []AssetValue         // Portfolio equity curve over time
 }
 
 func (p *PaperWallet) AssetsInfo(pair string) model.AssetInfo {

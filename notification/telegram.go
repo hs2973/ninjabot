@@ -1,3 +1,6 @@
+// Package notification provides notification services for trading bots including
+// Telegram integration for real-time alerts, order notifications, and interactive
+// trading commands. It supports user authentication and command-based trading operations.
 package notification
 
 import (
@@ -17,11 +20,13 @@ import (
 	"github.com/rodrigo-brito/ninjabot/service"
 )
 
+// Regular expressions for parsing Telegram trading commands
 var (
 	buyRegexp  = regexp.MustCompile(`/buy\s+(?P<pair>\w+)\s+(?P<amount>\d+(?:\.\d+)?)(?P<percent>%)?`)
 	sellRegexp = regexp.MustCompile(`/sell\s+(?P<pair>\w+)\s+(?P<amount>\d+(?:\.\d+)?)(?P<percent>%)?`)
 )
 
+// telegram implements the Telegram notification service with interactive trading capabilities.
 type telegram struct {
 	settings        model.Settings
 	orderController *order.Controller
@@ -29,8 +34,11 @@ type telegram struct {
 	client          *tb.Bot
 }
 
+// Option represents a functional option for configuring the Telegram service.
 type Option func(telegram *telegram)
 
+// NewTelegram creates a new Telegram notification service with the provided order controller
+// and settings. It initializes the Telegram bot with user authentication and command handling.
 func NewTelegram(controller *order.Controller, settings model.Settings, options ...Option) (service.Telegram, error) {
 	menu := &tb.ReplyMarkup{ResizeReplyKeyboard: true}
 	poller := &tb.LongPoller{Timeout: 10 * time.Second}

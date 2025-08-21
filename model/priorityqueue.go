@@ -2,6 +2,9 @@ package model
 
 import "sync"
 
+// PriorityQueue implements a thread-safe priority queue using a binary heap.
+// It maintains items in order based on their Less method and supports
+// notification callbacks when items are added.
 type PriorityQueue struct {
 	sync.Mutex
 	length          int
@@ -9,10 +12,14 @@ type PriorityQueue struct {
 	notifyCallbacks []func(Item)
 }
 
+// Item defines the interface that items stored in the PriorityQueue must implement.
+// The Less method determines the ordering of items in the queue.
 type Item interface {
 	Less(Item) bool
 }
 
+// NewPriorityQueue creates a new priority queue with optional initial data.
+// If data is provided, it will be heapified to maintain the priority order.
 func NewPriorityQueue(data []Item) *PriorityQueue {
 	q := &PriorityQueue{}
 	q.data = data
@@ -26,6 +33,8 @@ func NewPriorityQueue(data []Item) *PriorityQueue {
 	return q
 }
 
+// Push adds an item to the priority queue and maintains heap order.
+// It also triggers any registered notification callbacks asynchronously.
 func (q *PriorityQueue) Push(item Item) {
 	q.Lock()
 	defer q.Unlock()

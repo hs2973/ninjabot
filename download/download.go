@@ -1,3 +1,6 @@
+// Package download provides functionality for downloading historical market data
+// from cryptocurrency exchanges. It supports batch downloading with progress tracking
+// and CSV output for backtesting and analysis purposes.
 package download
 
 import (
@@ -15,23 +18,29 @@ import (
 
 const batchSize = 500
 
+// Downloader handles the downloading of historical market data from exchanges
+// with support for time range specification and progress tracking.
 type Downloader struct {
 	exchange service.Feeder
 }
 
+// NewDownloader creates a new Downloader instance with the specified exchange feeder.
 func NewDownloader(exchange service.Feeder) Downloader {
 	return Downloader{
 		exchange: exchange,
 	}
 }
 
+// Parameters holds configuration for download operations including time ranges.
 type Parameters struct {
 	Start time.Time
 	End   time.Time
 }
 
+// Option represents a functional option for configuring download parameters.
 type Option func(*Parameters)
 
+// WithInterval creates an option to specify the start and end time for data download.
 func WithInterval(start, end time.Time) Option {
 	return func(parameters *Parameters) {
 		parameters.Start = start
