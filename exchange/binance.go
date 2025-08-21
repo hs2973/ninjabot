@@ -14,24 +14,51 @@ import (
 	"github.com/rodrigo-brito/ninjabot/tools/log"
 )
 
+// MetadataFetchers defines a function type for fetching additional metadata
+// that gets attached to candle data during real-time streaming.
 type MetadataFetchers func(pair string, t time.Time) (string, float64)
 
+/*
+Binance implements the Exchange interface for Binance cryptocurrency exchange integration.
+It provides comprehensive trading capabilities including order management, market data
+streaming, account management, and both testnet and mainnet support.
+
+Key Features:
+  • Real-time market data streaming via WebSocket
+  • Full order management (market, limit, stop-loss, OCO orders)
+  • Account and position tracking
+  • Heikin-Ashi candle conversion support
+  • Custom metadata fetching for enhanced analysis
+  • Automatic precision handling for assets
+  • Testnet support for safe development
+
+Configuration Options:
+  • API credentials for authenticated trading
+  • Custom endpoint configuration for private deployments
+  • Heikin-Ashi candle transformation
+  • Testnet vs mainnet operation mode
+*/
 type Binance struct {
-	ctx        context.Context
-	client     *binance.Client
-	assetsInfo map[string]model.AssetInfo
-	HeikinAshi bool
-	Testnet    bool
+	ctx        context.Context             // Request context for API calls
+	client     *binance.Client             // Official Binance API client
+	assetsInfo map[string]model.AssetInfo  // Asset trading rules and precision info
+	HeikinAshi bool                        // Enable Heikin-Ashi candle conversion
+	Testnet    bool                        // Use testnet endpoints
 
-	APIKey    string
-	APISecret string
+	// Authentication credentials for API access
+	APIKey    string  // Binance API key
+	APISecret string  // Binance API secret
 
-	MetadataFetchers []MetadataFetchers
+	// Custom data enhancement during streaming
+	MetadataFetchers []MetadataFetchers  // Functions to fetch additional candle metadata
 }
 
+// BinanceOption defines a function type for configuring Binance exchange options.
 type BinanceOption func(*Binance)
 
-// WithBinanceCredentials will set Binance credentials
+// WithBinanceCredentials configures API credentials for authenticated trading operations.
+// Both key and secret are required for any trading activities including order placement,
+// account queries, and position management.
 func WithBinanceCredentials(key, secret string) BinanceOption {
 	return func(b *Binance) {
 		b.APIKey = key
@@ -39,29 +66,42 @@ func WithBinanceCredentials(key, secret string) BinanceOption {
 	}
 }
 
-// WithBinanceHeikinAshiCandle will convert candle to Heikin Ashi
+// WithBinanceHeikinAshiCandle enables automatic conversion of standard candles to Heikin-Ashi format.
+// Heikin-Ashi candles provide smoother trend visualization by using modified OHLC calculations
+// that reduce market noise and highlight trend direction more clearly.
 func WithBinanceHeikinAshiCandle() BinanceOption {
 	return func(b *Binance) {
 		b.HeikinAshi = true
 	}
 }
 
-// WithMetadataFetcher will execute a function after receive a new candle and include additional
-// information to candle's metadata
+// WithMetadataFetcher registers a custom function to fetch additional metadata for each candle.
+// The fetcher function is called after receiving each complete candle and can attach
+// custom indicators, external data, or computed values to the candle's metadata map.
+//
+// Example usage:
+//   fetcher := func(pair string, t time.Time) (string, float64) {
+//       return "volume_sma", calculateVolumeSMA(pair, t)
+//   }
+//   exchange := NewBinance(ctx, WithMetadataFetcher(fetcher))
 func WithMetadataFetcher(fetcher MetadataFetchers) BinanceOption {
 	return func(b *Binance) {
 		b.MetadataFetchers = append(b.MetadataFetchers, fetcher)
 	}
 }
 
-// WithTestNet activate Bianance testnet
+// WithTestNet activates Binance testnet mode for safe development and testing.
+// Testnet provides a sandbox environment with virtual funds for testing trading
+// strategies without risking real capital.
 func WithTestNet() BinanceOption {
 	return func(_ *Binance) {
 		binance.UseTestnet = true
 	}
 }
 
-// WithCustomMainAPIEndpoint will set custom endpoints for the Binance Main API
+// WithCustomMainAPIEndpoint configures custom endpoints for Binance mainnet API access.
+// This is useful for routing through proxy servers or using region-specific endpoints.
+// All three URLs (API, WebSocket, Combined) must be provided and non-empty.
 func WithCustomMainAPIEndpoint(apiURL, wsURL, combinedURL string) BinanceOption {
 	if apiURL == "" || wsURL == "" || combinedURL == "" {
 		log.Fatal("missing url parameters for custom endpoint configuration")
@@ -74,7 +114,9 @@ func WithCustomMainAPIEndpoint(apiURL, wsURL, combinedURL string) BinanceOption 
 	}
 }
 
-// WithCustomTestnetAPIEndpoint will set custom endpoints for the Binance Testnet API
+// WithCustomTestnetAPIEndpoint configures custom endpoints for Binance testnet API access.
+// Similar to mainnet configuration but applies to testnet infrastructure.
+// All three URLs (API, WebSocket, Combined) must be provided and non-empty.
 func WithCustomTestnetAPIEndpoint(apiURL, wsURL, combinedURL string) BinanceOption {
 	if apiURL == "" || wsURL == "" || combinedURL == "" {
 		log.Fatal("missing url parameters for custom endpoint configuration")
@@ -87,26 +129,57 @@ func WithCustomTestnetAPIEndpoint(apiURL, wsURL, combinedURL string) BinanceOpti
 	}
 }
 
-// NewBinance create a new Binance exchange instance
+/*
+NewBinance creates a new Binance exchange instance with comprehensive initialization.
+
+Initialization Process:
+  1. Enable WebSocket keepalive for stable connections
+  2. Apply all configuration options (credentials, endpoints, etc.)
+  3. Initialize the official Binance API client
+  4. Test connectivity with ping service
+  5. Fetch exchange information and trading rules
+  6. Parse asset precision and trading limits for all symbols
+  7. Cache asset information for order validation
+
+The function retrieves and caches detailed trading rules for each symbol including:
+  • Minimum/maximum order quantities and step sizes
+  • Price filters with tick sizes and ranges
+  • Base/quote asset precision settings
+
+Parameters:
+  • ctx: Context for request lifecycle management
+  • options: Functional options for exchange configuration
+
+Returns initialized Binance exchange or error if setup fails.
+*/
 func NewBinance(ctx context.Context, options ...BinanceOption) (*Binance, error) {
+	// Enable persistent WebSocket connections for real-time data
 	binance.WebsocketKeepalive = true
+	
+	// Initialize exchange with context
 	exchange := &Binance{ctx: ctx}
+	
+	// Apply all configuration options
 	for _, option := range options {
 		option(exchange)
 	}
 
+	// Create authenticated API client
 	exchange.client = binance.NewClient(exchange.APIKey, exchange.APISecret)
+	
+	// Test API connectivity
 	err := exchange.client.NewPingService().Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("binance ping fail: %w", err)
 	}
 
+	// Fetch exchange trading rules and symbol information
 	results, err := exchange.client.NewExchangeInfoService().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// Initialize with orders precision and assets limits
+	// Initialize asset information cache with precision and trading limits
 	exchange.assetsInfo = make(map[string]model.AssetInfo)
 	for _, info := range results.Symbols {
 		tradeLimits := model.AssetInfo{
@@ -115,14 +188,18 @@ func NewBinance(ctx context.Context, options ...BinanceOption) (*Binance, error)
 			BaseAssetPrecision: info.BaseAssetPrecision,
 			QuotePrecision:     info.QuotePrecision,
 		}
+		
+		// Parse trading filters for order validation
 		for _, filter := range info.Filters {
 			if typ, ok := filter["filterType"]; ok {
+				// Extract lot size constraints for quantity validation
 				if typ == string(binance.SymbolFilterTypeLotSize) {
 					tradeLimits.MinQuantity, _ = strconv.ParseFloat(filter["minQty"].(string), 64)
 					tradeLimits.MaxQuantity, _ = strconv.ParseFloat(filter["maxQty"].(string), 64)
 					tradeLimits.StepSize, _ = strconv.ParseFloat(filter["stepSize"].(string), 64)
 				}
 
+				// Extract price filter constraints for price validation
 				if typ == string(binance.SymbolFilterTypePriceFilter) {
 					tradeLimits.MinPrice, _ = strconv.ParseFloat(filter["minPrice"].(string), 64)
 					tradeLimits.MaxPrice, _ = strconv.ParseFloat(filter["maxPrice"].(string), 64)
@@ -138,6 +215,8 @@ func NewBinance(ctx context.Context, options ...BinanceOption) (*Binance, error)
 	return exchange, nil
 }
 
+// LastQuote retrieves the most recent closing price for the specified trading pair.
+// It fetches the latest 1-minute candle and returns the closing price.
 func (b *Binance) LastQuote(ctx context.Context, pair string) (float64, error) {
 	candles, err := b.CandlesByLimit(ctx, pair, "1m", 1)
 	if err != nil || len(candles) < 1 {
@@ -146,10 +225,14 @@ func (b *Binance) LastQuote(ctx context.Context, pair string) (float64, error) {
 	return candles[0].Close, nil
 }
 
+// AssetsInfo returns the cached trading rules and precision information for a trading pair.
+// This includes minimum/maximum quantities, price ranges, step sizes, and decimal precision.
 func (b *Binance) AssetsInfo(pair string) model.AssetInfo {
 	return b.assetsInfo[pair]
 }
 
+// validate checks if an order quantity complies with the exchange's trading rules.
+// It verifies the asset exists and the quantity falls within min/max limits.
 func (b *Binance) validate(pair string, quantity float64) error {
 	info, ok := b.assetsInfo[pair]
 	if !ok {
@@ -167,15 +250,31 @@ func (b *Binance) validate(pair string, quantity float64) error {
 	return nil
 }
 
+/*
+CreateOrderOCO creates an OCO (One-Cancels-Other) order consisting of a limit order and a stop-limit order.
+OCO orders are useful for profit-taking and stop-loss strategies where only one side should execute.
+
+Parameters:
+  • side: Buy or sell direction
+  • pair: Trading pair symbol (e.g., "BTCUSDT")  
+  • quantity: Order size in base asset units
+  • price: Limit order price
+  • stop: Stop trigger price
+  • stopLimit: Stop-limit order execution price
+
+The function validates quantity against exchange rules and returns both orders created.
+If either order executes, the other is automatically cancelled by the exchange.
+*/
 func (b *Binance) CreateOrderOCO(side model.SideType, pair string,
 	quantity, price, stop, stopLimit float64) ([]model.Order, error) {
 
-	// validate stop
+	// Validate order quantity against exchange trading rules
 	err := b.validate(pair, quantity)
 	if err != nil {
 		return nil, err
 	}
 
+	// Submit OCO order to exchange
 	ocoOrder, err := b.client.NewCreateOCOService().
 		Side(binance.SideType(side)).
 		Quantity(b.formatQuantity(pair, quantity)).
@@ -189,6 +288,7 @@ func (b *Binance) CreateOrderOCO(side model.SideType, pair string,
 		return nil, err
 	}
 
+	// Convert exchange response to internal order format
 	orders := make([]model.Order, 0, len(ocoOrder.Orders))
 	for _, order := range ocoOrder.OrderReports {
 		price, _ := strconv.ParseFloat(order.Price, 64)
@@ -206,6 +306,7 @@ func (b *Binance) CreateOrderOCO(side model.SideType, pair string,
 			GroupID:    &order.OrderListID,
 		}
 
+		// Add stop price for stop-loss orders
 		if item.Type == model.OrderTypeStopLossLimit || item.Type == model.OrderTypeStopLoss {
 			item.Stop = &stop
 		}
