@@ -1,6 +1,15 @@
-// Package model defines core data structures and types used throughout the ninjabot framework.
-// It includes trading models like candles, orders, accounts, and dataframes, as well as
-// configuration structures for bot settings and exchange connections.
+/*
+Package model defines core data structures and types used throughout the ninjabot framework.
+
+Core Components:
+  • Trading Models - Candles, orders, accounts, and market data structures
+  • Configuration - Bot settings, exchange connections, and user preferences  
+  • Data Structures - Time series, dataframes, and priority queues
+  • Financial Types - Balance information, asset details, and trading constraints
+
+This package provides the foundation for all trading operations, data analysis,
+and bot configuration throughout the ninjabot ecosystem.
+*/
 package model
 
 import (
@@ -10,44 +19,115 @@ import (
 	"time"
 )
 
-// TelegramSettings holds configuration for Telegram bot notifications including
-// the bot token and list of authorized user IDs who can receive notifications.
+/*
+TelegramSettings holds configuration for Telegram bot notifications.
+
+Configuration Requirements:
+  • Token: Bot token obtained from @BotFather on Telegram
+  • Users: List of authorized Telegram user IDs for notifications
+  • Enabled: Flag to activate/deactivate Telegram notifications
+
+Security Considerations:
+  • Bot token should be kept secure and not logged
+  • User IDs should be verified to prevent unauthorized access
+  • Consider rate limiting for high-frequency notifications
+
+Example Configuration:
+  settings := TelegramSettings{
+      Enabled: true,
+      Token:   "123456789:ABCdefGHIjklMNOpqrsTUVwxyz",
+      Users:   []int{12345678, 87654321},
+  }
+*/
 type TelegramSettings struct {
-	Enabled bool
-	Token   string
-	Users   []int
+	Enabled bool   // Enable/disable Telegram notifications
+	Token   string // Bot token from @BotFather
+	Users   []int  // Authorized user IDs for notifications
 }
 
-// Settings contains the main bot configuration including trading pairs
-// and notification settings. This structure is used to initialize the bot
-// with the desired trading pairs and communication preferences.
+/*
+Settings contains the main bot configuration including trading pairs
+and notification settings.
+
+Configuration Structure:
+  • Pairs: List of trading pairs in ASSET/QUOTE format (e.g., "BTC/USDT")
+  • Telegram: Notification configuration for real-time alerts
+
+This structure is used during bot initialization to configure trading
+operations and communication preferences.
+
+Example:
+  settings := Settings{
+      Pairs: []string{"BTC/USDT", "ETH/USDT", "BNB/USDT"},
+      Telegram: TelegramSettings{
+          Enabled: true,
+          Token:   "your-bot-token",
+          Users:   []int{123456789},
+      },
+  }
+*/
 type Settings struct {
-	Pairs    []string
-	Telegram TelegramSettings
+	Pairs    []string          // Trading pairs to monitor and trade
+	Telegram TelegramSettings  // Telegram notification configuration
 }
 
-// Balance represents an account balance for a specific asset including
-// free (available) and locked (reserved for orders) amounts, plus leverage information.
+/*
+Balance represents an account balance for a specific asset.
+
+Balance Components:
+  • Asset: The cryptocurrency or fiat currency symbol (e.g., "BTC", "USDT")
+  • Free: Available balance that can be used for new orders
+  • Lock: Balance locked in pending orders or other reservations
+  • Leverage: Available leverage multiplier for margin trading (if supported)
+
+Balance Calculations:
+  • Total Balance = Free + Lock
+  • Available for Trading = Free (Lock is reserved)
+  • Leveraged Capacity = Free * Leverage (for margin accounts)
+
+Usage in Trading:
+  • Order placement checks against Free balance
+  • Risk management considers total exposure
+  • Portfolio analysis uses combined balances
+*/
 type Balance struct {
-	Asset    string
-	Free     float64
-	Lock     float64
-	Leverage float64
+	Asset    string  // Currency symbol (BTC, ETH, USDT, etc.)
+	Free     float64 // Available balance for new orders
+	Lock     float64 // Balance locked in pending orders
+	Leverage float64 // Leverage multiplier (1.0 = no leverage)
 }
 
-// AssetInfo contains detailed information about a trading pair including
-// price and quantity constraints, precision settings, and trading rules
-// as defined by the exchange.
-type AssetInfo struct {
-	BaseAsset  string
-	QuoteAsset string
+/*
+AssetInfo contains detailed trading rules and constraints for a trading pair.
 
-	MinPrice    float64
-	MaxPrice    float64
-	MinQuantity float64
-	MaxQuantity float64
-	StepSize    float64
-	TickSize    float64
+Trading Constraints:
+  • Price Limits: Minimum and maximum allowed order prices
+  • Quantity Limits: Minimum and maximum allowed order sizes
+  • Precision Rules: Step size for quantities, tick size for prices
+
+Exchange Integration:
+  • Each exchange provides these rules via their API
+  • Rules are used to validate orders before submission
+  • Prevents order rejection due to constraint violations
+
+Order Validation:
+  • Quantities must be multiples of StepSize
+  • Prices must be multiples of TickSize
+  • Values must be within Min/Max ranges
+*/
+type AssetInfo struct {
+	BaseAsset  string // Base currency (e.g., "BTC" in BTC/USDT)
+	QuoteAsset string // Quote currency (e.g., "USDT" in BTC/USDT)
+
+	// Price Constraints
+	MinPrice    float64 // Minimum allowed order price
+	MaxPrice    float64 // Maximum allowed order price
+	TickSize    float64 // Price precision step (prices must be multiples)
+	
+	// Quantity Constraints  
+	MinQuantity float64 // Minimum allowed order quantity
+	MaxQuantity float64 // Maximum allowed order quantity
+	StepSize    float64 // Quantity precision step (quantities must be multiples)
 
 	QuotePrecision     int
 	BaseAssetPrecision int

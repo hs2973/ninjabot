@@ -1,7 +1,25 @@
-// Package exchange provides data feed management, order execution interfaces,
-// and exchange-specific implementations for cryptocurrency trading.
-// It includes support for real-time data subscriptions, paper trading,
-// and various exchange protocols.
+/*
+Package exchange provides data feed management, order execution interfaces,
+and exchange-specific implementations for cryptocurrency trading.
+
+Core Functionality:
+  • Real-time Market Data - WebSocket streams and REST API integration
+  • Order Execution - Buy/sell order placement and tracking across exchanges
+  • Data Feed Management - Subscription handling and event distribution
+  • Paper Trading - Simulated trading environment for backtesting
+
+Supported Features:
+  • Multiple exchange connectivity (Binance, etc.)
+  • Real-time candle data streaming
+  • Order book and trade data
+  • Comprehensive error handling and retry logic
+  • Exchange-agnostic interface design
+
+Architecture:
+  • DataFeedSubscription manages multi-pair data streams
+  • PaperWallet provides realistic trading simulation
+  • Exchange interface abstracts specific exchange implementations
+*/
 package exchange
 
 import (
@@ -18,28 +36,78 @@ import (
 	"github.com/rodrigo-brito/ninjabot/tools/log"
 )
 
-// Common exchange errors
+// ═══════════════════════════════════════════════════════════════════
+// Exchange Error Definitions
+// ═══════════════════════════════════════════════════════════════════
+
+// Common exchange errors that can occur during trading operations.
+// These standardized errors enable consistent error handling across
+// different exchange implementations and trading strategies.
 var (
-	ErrInvalidQuantity   = errors.New("invalid quantity")
-	ErrInsufficientFunds = errors.New("insufficient funds or locked")
-	ErrInvalidAsset      = errors.New("invalid asset")
+	ErrInvalidQuantity   = errors.New("invalid quantity")    // Order quantity violates exchange rules
+	ErrInsufficientFunds = errors.New("insufficient funds or locked") // Not enough balance for order
+	ErrInvalidAsset      = errors.New("invalid asset")       // Asset not supported or malformed
 )
 
-// DataFeed represents a channel-based data feed for market data streaming.
-// It provides separate channels for data and error handling.
+// ═══════════════════════════════════════════════════════════════════
+// Data Feed Core Types
+// ═══════════════════════════════════════════════════════════════════
+
+/*
+DataFeed represents a channel-based data feed for market data streaming.
+
+Channel Architecture:
+  • Data: Receives model.Candle objects for market data
+  • Err: Receives error objects for connection/data issues
+
+Usage Pattern:
+  feed := &DataFeed{
+      Data: make(chan model.Candle, 100),
+      Err:  make(chan error, 10),
+  }
+  
+  // Consumer goroutine
+  go func() {
+      for {
+          select {
+          case candle := <-feed.Data:
+              // Process market data
+          case err := <-feed.Err:
+              // Handle feed errors
+          }
+      }
+  }()
+*/
 type DataFeed struct {
-	Data chan model.Candle
-	Err  chan error
+	Data chan model.Candle // Channel for receiving market data candles
+	Err  chan error        // Channel for receiving feed errors
 }
 
-// DataFeedSubscription manages multiple data feed subscriptions and their consumers.
-// It coordinates market data distribution to multiple subscribers and handles
-// connection management for real-time data feeds.
+/*
+DataFeedSubscription manages multiple data feed subscriptions and their consumers.
+
+Architecture Overview:
+  • Centralized subscription management for multiple trading pairs
+  • Fan-out distribution to multiple consumers per data feed
+  • Connection pooling and lifecycle management for exchange streams
+  • Thread-safe subscription/unsubscription operations
+
+Key Components:
+  • exchange: Target exchange interface for data retrieval
+  • Feeds: Ordered set of active feed identifiers
+  • DataFeeds: Map of feed keys to DataFeed channels
+  • SubscriptionsByDataFeed: Consumer callbacks grouped by feed
+
+Threading Model:
+  • Each data feed runs in its own goroutine
+  • Consumers are called synchronously (should be lightweight)
+  • Connection management handled asynchronously
+*/
 type DataFeedSubscription struct {
-	exchange                service.Exchange
-	Feeds                   *set.LinkedHashSetString
-	DataFeeds               map[string]*DataFeed
-	SubscriptionsByDataFeed map[string][]Subscription
+	exchange                service.Exchange                    // Exchange interface for data access
+	Feeds                   *set.LinkedHashSetString           // Ordered set of active feed keys
+	DataFeeds               map[string]*DataFeed               // Feed channels by key
+	SubscriptionsByDataFeed map[string][]Subscription          // Consumer subscriptions by feed
 }
 
 // Subscription represents a single data feed subscription with its configuration

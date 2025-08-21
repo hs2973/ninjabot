@@ -1,6 +1,26 @@
-// Package order provides order management, execution tracking, and trading result analysis.
-// It includes order controllers, data feeds, and comprehensive trading statistics
-// with support for both live trading and backtesting scenarios.
+/*
+Package order provides order management, execution tracking, and trading result analysis.
+
+Core Components:
+  • Order Controller - Central order execution and lifecycle management
+  • Order Feed - Event distribution system for order status updates  
+  • Trading Results - Comprehensive performance analysis and statistics
+  • Summary Analysis - Win/loss tracking, profit calculation, and metrics
+
+Key Features:
+  • Multi-exchange order routing and execution
+  • Real-time order status tracking and notifications
+  • Advanced trading statistics (SQN, Payoff, Profit Factor)
+  • Support for both live trading and backtesting scenarios
+  • Thread-safe concurrent order processing
+
+Performance Metrics:
+  • System Quality Number (SQN) for strategy evaluation
+  • Payoff ratio analysis (average win / average loss)
+  • Profit factor calculation (gross profit / gross loss)
+  • Win/loss percentage and trade frequency analysis
+  • Bootstrap confidence intervals for statistical validation
+*/
 package order
 
 import (
@@ -22,20 +42,46 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// summary contains trading performance statistics for a specific trading pair
-// including win/loss records, profit percentages, and volume information
-// separated by long and short positions.
+// ═══════════════════════════════════════════════════════════════════
+// Trading Performance Analysis Types
+// ═══════════════════════════════════════════════════════════════════
+
+/*
+summary contains comprehensive trading performance statistics for a specific trading pair.
+
+Statistical Categories:
+  • Win Trades: Profitable trades separated by long/short positions
+  • Lose Trades: Unprofitable trades separated by long/short positions  
+  • Percentage Returns: Normalized returns for statistical analysis
+  • Volume: Total trading volume for the pair
+
+Long vs Short Separation:
+  • Long positions: Buy first, sell later (profit from price increases)
+  • Short positions: Sell first, buy later (profit from price decreases)
+  • Separate tracking enables strategy analysis and risk assessment
+
+Data Structure Design:
+  • Slices store individual trade results for detailed analysis
+  • Percentage returns enable normalized comparison across assets
+  • Volume tracking supports position sizing analysis
+*/
 type summary struct {
-	Pair             string
-	WinLong          []float64
-	WinLongPercent   []float64
-	WinShort         []float64
-	WinShortPercent  []float64
-	LoseLong         []float64
-	LoseLongPercent  []float64
-	LoseShort        []float64
-	LoseShortPercent []float64
-	Volume           float64
+	Pair             string    // Trading pair identifier (e.g., "BTC/USDT")
+	
+	// Long Position Results
+	WinLong          []float64 // Profitable long trades (absolute values)
+	WinLongPercent   []float64 // Profitable long trades (percentage returns)
+	LoseLong         []float64 // Unprofitable long trades (absolute values)
+	LoseLongPercent  []float64 // Unprofitable long trades (percentage returns)
+	
+	// Short Position Results  
+	WinShort         []float64 // Profitable short trades (absolute values)
+	WinShortPercent  []float64 // Profitable short trades (percentage returns)
+	LoseShort        []float64 // Unprofitable short trades (absolute values)
+	LoseShortPercent []float64 // Unprofitable short trades (percentage returns)
+	
+	// Trading Volume
+	Volume           float64   // Total trading volume for this pair
 }
 
 // Win returns all winning trades combining both long and short positions.
