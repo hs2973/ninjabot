@@ -7,25 +7,28 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
-// Series is a time series of values
+// Series represents a generic time series of ordered values with utility methods
+// for accessing recent values, statistical operations, and data manipulation.
 type Series[T constraints.Ordered] []T
 
-// Values returns the values of the series
+// Values returns the underlying slice of values in the series.
 func (s Series[T]) Values() []T {
 	return s
 }
 
-// Length returns the number of values in the series
+// Length returns the total number of values in the series.
 func (s Series[T]) Length() int {
 	return len(s)
 }
 
-// Last returns the last value of the series given a past index position
+// Last returns a value from the series counting backwards from the most recent value.
+// Position 0 returns the most recent value, position 1 returns the previous value, etc.
 func (s Series[T]) Last(position int) T {
 	return s[len(s)-1-position]
 }
 
-// LastValues returns the last values of the series given a size
+// LastValues returns the most recent values from the series up to the specified size.
+// If the series has fewer values than requested, returns the entire series.
 func (s Series[T]) LastValues(size int) []T {
 	if l := len(s); l > size {
 		return s[l-size:]

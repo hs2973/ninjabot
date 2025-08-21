@@ -5,14 +5,21 @@ import (
 	"time"
 )
 
+// Trading order side types
 type SideType string
+
+// Trading order types
 type OrderType string
+
+// Order status types
 type OrderStatusType string
 
+// Order side constants
 var (
 	SideTypeBuy  SideType = "BUY"
 	SideTypeSell SideType = "SELL"
 
+	// Order type constants
 	OrderTypeLimit           OrderType = "LIMIT"
 	OrderTypeMarket          OrderType = "MARKET"
 	OrderTypeLimitMaker      OrderType = "LIMIT_MAKER"
@@ -21,6 +28,7 @@ var (
 	OrderTypeTakeProfit      OrderType = "TAKE_PROFIT"
 	OrderTypeTakeProfitLimit OrderType = "TAKE_PROFIT_LIMIT"
 
+	// Order status constants
 	OrderStatusTypeNew             OrderStatusType = "NEW"
 	OrderStatusTypePartiallyFilled OrderStatusType = "PARTIALLY_FILLED"
 	OrderStatusTypeFilled          OrderStatusType = "FILLED"
@@ -30,6 +38,8 @@ var (
 	OrderStatusTypeExpired         OrderStatusType = "EXPIRED"
 )
 
+// Order represents a trading order with all relevant information including
+// identification, trading pair, order type, pricing, and execution details.
 type Order struct {
 	ID         int64           `db:"id" json:"id" gorm:"primaryKey,autoIncrement"`
 	ExchangeID int64           `db:"exchange_id" json:"exchange_id"`
