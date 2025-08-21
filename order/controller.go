@@ -1,3 +1,6 @@
+// Package order provides order management, execution tracking, and trading result analysis.
+// It includes order controllers, data feeds, and comprehensive trading statistics
+// with support for both live trading and backtesting scenarios.
 package order
 
 import (
@@ -19,6 +22,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// summary contains trading performance statistics for a specific trading pair
+// including win/loss records, profit percentages, and volume information
+// separated by long and short positions.
 type summary struct {
 	Pair             string
 	WinLong          []float64
@@ -32,22 +38,27 @@ type summary struct {
 	Volume           float64
 }
 
+// Win returns all winning trades combining both long and short positions.
 func (s summary) Win() []float64 {
 	return append(s.WinLong, s.WinShort...)
 }
 
+// WinPercent returns all winning trade percentages combining both long and short positions.
 func (s summary) WinPercent() []float64 {
 	return append(s.WinLongPercent, s.WinShortPercent...)
 }
 
+// Lose returns all losing trades combining both long and short positions.
 func (s summary) Lose() []float64 {
 	return append(s.LoseLong, s.LoseShort...)
 }
 
+// LosePercent returns all losing trade percentages combining both long and short positions.
 func (s summary) LosePercent() []float64 {
 	return append(s.LoseLongPercent, s.LoseShortPercent...)
 }
 
+// Profit calculates the total profit/loss by summing all winning and losing trades.
 func (s summary) Profit() float64 {
 	profit := 0.0
 	for _, value := range append(s.Win(), s.Lose()...) {
@@ -56,6 +67,8 @@ func (s summary) Profit() float64 {
 	return profit
 }
 
+// SQN calculates the System Quality Number, a measure of trading system quality
+// that considers both profitability and consistency. Higher values indicate better systems.
 func (s summary) SQN() float64 {
 	total := float64(len(s.Win()) + len(s.Lose()))
 	avgProfit := s.Profit() / total
@@ -67,6 +80,8 @@ func (s summary) SQN() float64 {
 	return math.Sqrt(total) * (s.Profit() / total) / stdDev
 }
 
+// Payoff calculates the average winning trade divided by the average losing trade.
+// Values greater than 1 indicate that wins are larger than losses on average.
 func (s summary) Payoff() float64 {
 	avgWin := 0.0
 	avgLose := 0.0
