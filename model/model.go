@@ -1,3 +1,6 @@
+// Package model defines core data structures and types used throughout the ninjabot framework.
+// It includes trading models like candles, orders, accounts, and dataframes, as well as
+// configuration structures for bot settings and exchange connections.
 package model
 
 import (
@@ -7,17 +10,24 @@ import (
 	"time"
 )
 
+// TelegramSettings holds configuration for Telegram bot notifications including
+// the bot token and list of authorized user IDs who can receive notifications.
 type TelegramSettings struct {
 	Enabled bool
 	Token   string
 	Users   []int
 }
 
+// Settings contains the main bot configuration including trading pairs
+// and notification settings. This structure is used to initialize the bot
+// with the desired trading pairs and communication preferences.
 type Settings struct {
 	Pairs    []string
 	Telegram TelegramSettings
 }
 
+// Balance represents an account balance for a specific asset including
+// free (available) and locked (reserved for orders) amounts, plus leverage information.
 type Balance struct {
 	Asset    string
 	Free     float64
@@ -25,6 +35,9 @@ type Balance struct {
 	Leverage float64
 }
 
+// AssetInfo contains detailed information about a trading pair including
+// price and quantity constraints, precision settings, and trading rules
+// as defined by the exchange.
 type AssetInfo struct {
 	BaseAsset  string
 	QuoteAsset string
@@ -40,6 +53,9 @@ type AssetInfo struct {
 	BaseAssetPrecision int
 }
 
+// Dataframe represents a collection of market data organized in time series format.
+// It contains OHLCV (Open, High, Low, Close, Volume) data along with timestamps
+// and supports custom metadata for indicators and additional analysis data.
 type Dataframe struct {
 	Pair string
 
@@ -56,6 +72,9 @@ type Dataframe struct {
 	Metadata map[string]Series[float64]
 }
 
+// Sample returns a new Dataframe containing only the last 'positions' number of data points.
+// This is useful for limiting the dataset size or focusing on recent market activity.
+// If positions exceeds the available data, the entire dataframe is returned.
 func (df Dataframe) Sample(positions int) Dataframe {
 	size := len(df.Time)
 	start := size - positions
@@ -82,6 +101,9 @@ func (df Dataframe) Sample(positions int) Dataframe {
 	return sample
 }
 
+// Candle represents a single market data point containing OHLCV information
+// for a specific time period. It includes completion status and supports
+// additional metadata for custom analysis or CSV imports.
 type Candle struct {
 	Pair      string
 	Time      time.Time
@@ -97,18 +119,28 @@ type Candle struct {
 	Metadata map[string]float64
 }
 
+// Empty returns true if the candle contains no meaningful data.
+// This is useful for checking if a candle has been properly initialized
+// or if it represents a null/empty state.
 func (c Candle) Empty() bool {
 	return c.Pair == "" && c.Close == 0 && c.Open == 0 && c.Volume == 0
 }
 
+// HeikinAshi maintains state for calculating Heikin-Ashi candles, which are
+// modified candlesticks that help filter market noise and identify trends.
+// It stores the previous Heikin-Ashi candle needed for continuous calculations.
 type HeikinAshi struct {
 	PreviousHACandle Candle
 }
 
+// NewHeikinAshi creates a new HeikinAshi calculator instance.
+// This initializes the state needed for Heikin-Ashi candle calculations.
 func NewHeikinAshi() *HeikinAshi {
 	return &HeikinAshi{}
 }
 
+// ToSlice converts the candle data to a string slice format suitable for CSV output.
+// The precision parameter controls the number of decimal places for floating-point values.
 func (c Candle) ToSlice(precision int) []string {
 	return []string{
 		fmt.Sprintf("%d", c.Time.Unix()),
@@ -120,6 +152,9 @@ func (c Candle) ToSlice(precision int) []string {
 	}
 }
 
+// ToHeikinAshi converts a regular candle to a Heikin-Ashi candle using the provided
+// HeikinAshi calculator. This creates smoothed candles that help identify trends
+// by reducing market noise in the visualization.
 func (c Candle) ToHeikinAshi(ha *HeikinAshi) Candle {
 	haCandle := ha.CalculateHeikinAshi(c)
 
@@ -136,6 +171,9 @@ func (c Candle) ToHeikinAshi(ha *HeikinAshi) Candle {
 	}
 }
 
+// Less compares two candles for ordering in priority queues or sorting operations.
+// Candles are ordered first by time, then by update time, and finally by pair name.
+// This ensures proper chronological processing of market data.
 func (c Candle) Less(j Item) bool {
 	diff := j.(Candle).Time.Sub(c.Time)
 	if diff < 0 {
@@ -156,10 +194,15 @@ func (c Candle) Less(j Item) bool {
 	return c.Pair < j.(Candle).Pair
 }
 
+// Account represents a trading account containing balance information for various assets.
+// It provides methods to query specific balances and calculate total equity.
 type Account struct {
 	Balances []Balance
 }
 
+// Balance retrieves the balance information for the specified asset and quote currencies.
+// This is commonly used to check available funds before placing orders or calculating
+// portfolio positions for a trading pair.
 func (a Account) Balance(assetTick, quoteTick string) (Balance, Balance) {
 	var assetBalance, quoteBalance Balance
 	var isSetAsset, isSetQuote bool
@@ -182,6 +225,9 @@ func (a Account) Balance(assetTick, quoteTick string) (Balance, Balance) {
 	return assetBalance, quoteBalance
 }
 
+// Equity calculates the total equity (value) of the account by summing all
+// free and locked balances across all assets. This provides a snapshot
+// of the account's total value at a given time.
 func (a Account) Equity() float64 {
 	var total float64
 
@@ -193,6 +239,9 @@ func (a Account) Equity() float64 {
 	return total
 }
 
+// CalculateHeikinAshi computes a Heikin-Ashi candle from a regular candle using
+// the stored previous Heikin-Ashi candle state. This implementation follows
+// the standard Heikin-Ashi calculation formula to produce smoothed candlesticks.
 func (ha *HeikinAshi) CalculateHeikinAshi(c Candle) Candle {
 	var hkCandle Candle
 

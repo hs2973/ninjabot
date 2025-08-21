@@ -1,3 +1,7 @@
+// Package ninjabot provides a comprehensive framework for building cryptocurrency trading bots.
+// It supports backtesting, paper trading, and live trading with various exchanges.
+// The package includes strategy management, order execution, data feeds, notifications,
+// and comprehensive analysis tools for algorithmic trading.
 package ninjabot
 
 import (
@@ -25,6 +29,8 @@ import (
 
 const defaultDatabase = "ninjabot.db"
 
+// init initializes the logging system with a custom formatter that includes
+// full timestamps and a specific timestamp format for better readability.
 func init() {
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp:   true,
@@ -32,14 +38,23 @@ func init() {
 	})
 }
 
+// OrderSubscriber defines the interface for components that need to be notified
+// when orders are created, updated, or filled. Implementing types can react
+// to order events for logging, notifications, or strategy adjustments.
 type OrderSubscriber interface {
 	OnOrder(model.Order)
 }
 
+// CandleSubscriber defines the interface for components that need to be notified
+// when new candle data becomes available. This is typically used by strategies
+// and indicators that need to process market data as it arrives.
 type CandleSubscriber interface {
 	OnCandle(model.Candle)
 }
 
+// NinjaBot represents the main trading bot instance that coordinates all components
+// including exchange connections, strategy execution, order management, data feeds,
+// and notifications. It supports both backtesting and live trading modes.
 type NinjaBot struct {
 	storage  storage.Storage
 	settings model.Settings
@@ -58,8 +73,25 @@ type NinjaBot struct {
 	backtest bool
 }
 
+// Option represents a functional option pattern for configuring NinjaBot instances.
+// This allows for flexible and extensible configuration without breaking changes
+// to the constructor function signature.
 type Option func(*NinjaBot)
 
+// NewBot creates a new NinjaBot instance with the specified settings, exchange, and strategy.
+// It initializes all necessary components including order management, data feeds, and storage.
+// Additional configuration can be applied using the functional options pattern.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeouts
+//   - settings: Bot configuration including pairs and notifications
+//   - exch: Exchange interface for trading operations
+//   - str: Trading strategy to execute
+//   - options: Optional configuration functions
+//
+// Returns:
+//   - *NinjaBot: Configured bot instance
+//   - error: Configuration or initialization error
 func NewBot(ctx context.Context, settings model.Settings, exch service.Exchange, str strategy.Strategy,
 	options ...Option) (*NinjaBot, error) {
 
@@ -153,6 +185,9 @@ func WithPaperWallet(wallet *exchange.PaperWallet) Option {
 	}
 }
 
+// SubscribeCandle registers candle subscribers to receive market data updates
+// for all configured trading pairs. The subscription is set up with the
+// strategy's timeframe to ensure data consistency.
 func (n *NinjaBot) SubscribeCandle(subscriptions ...CandleSubscriber) {
 	for _, pair := range n.settings.Pairs {
 		for _, subscription := range subscriptions {
@@ -161,12 +196,17 @@ func (n *NinjaBot) SubscribeCandle(subscriptions ...CandleSubscriber) {
 	}
 }
 
+// WithOrderSubscription returns an option that registers an order subscriber
+// to receive notifications about order events including creation, updates, and fills.
 func WithOrderSubscription(subscriber OrderSubscriber) Option {
 	return func(bot *NinjaBot) {
 		bot.SubscribeOrder(subscriber)
 	}
 }
 
+// SubscribeOrder registers order subscribers to receive order event notifications
+// for all configured trading pairs. This enables components to react to order
+// lifecycle events for logging, notifications, or strategy adjustments.
 func (n *NinjaBot) SubscribeOrder(subscriptions ...OrderSubscriber) {
 	for _, pair := range n.settings.Pairs {
 		for _, subscription := range subscriptions {
@@ -175,6 +215,8 @@ func (n *NinjaBot) SubscribeOrder(subscriptions ...OrderSubscriber) {
 	}
 }
 
+// Controller returns the order controller instance which manages order execution,
+// tracking, and provides access to trading results and statistics.
 func (n *NinjaBot) Controller() *order.Controller {
 	return n.orderController
 }
@@ -273,6 +315,9 @@ func (n *NinjaBot) Summary() {
 
 }
 
+// SaveReturns exports trading returns data for all pairs to CSV files in the specified directory.
+// Each trading pair gets its own CSV file containing the percentage returns for analysis.
+// This is useful for statistical analysis and external visualization tools.
 func (n NinjaBot) SaveReturns(outputDir string) error {
 	for _, summary := range n.orderController.Results {
 		outputFile := fmt.Sprintf("%s/%s.csv", outputDir, summary.Pair)
@@ -283,10 +328,16 @@ func (n NinjaBot) SaveReturns(outputDir string) error {
 	return nil
 }
 
+// onCandle handles incoming candle data by adding it to the priority queue
+// for chronological processing. This ensures candles are processed in the
+// correct time order, which is crucial for accurate backtesting and live trading.
 func (n *NinjaBot) onCandle(candle model.Candle) {
 	n.priorityQueueCandle.Push(candle)
 }
 
+// processCandle handles individual candle processing by updating the paper wallet
+// (if enabled) and notifying the appropriate strategy controller. Complete candles
+// trigger full strategy processing and order controller updates.
 func (n *NinjaBot) processCandle(candle model.Candle) {
 	if n.paperWallet != nil {
 		n.paperWallet.OnCandle(candle)
@@ -299,15 +350,18 @@ func (n *NinjaBot) processCandle(candle model.Candle) {
 	}
 }
 
-// Process pending candles in buffer
+// processCandles continuously processes pending candles from the priority queue buffer.
+// This method runs in production mode to handle real-time candle updates as they arrive
+// from the exchange data feed, ensuring proper chronological order.
 func (n *NinjaBot) processCandles() {
 	for item := range n.priorityQueueCandle.PopLock() {
 		n.processCandle(item.(model.Candle))
 	}
 }
 
-// Start the backtest process and create a progress bar
-// backtestCandles will process candles from a prirority queue in chronological order
+// backtestCandles processes all candles in chronological order for backtesting mode.
+// It displays a progress bar and processes candles sequentially without real-time delays.
+// This method is optimized for historical data processing and strategy validation.
 func (n *NinjaBot) backtestCandles() {
 	log.Info("[SETUP] Starting backtesting")
 
@@ -331,8 +385,9 @@ func (n *NinjaBot) backtestCandles() {
 	}
 }
 
-// Before Ninjabot start, we need to load the necessary data to fill strategy indicators
-// Then, we need to get the time frame and warmup period to fetch the necessary candles
+// preload fetches and processes historical candle data to warm up strategy indicators
+// before starting live trading or backtesting. The warmup period is determined by
+// the strategy's requirements and ensures indicators have sufficient data for accurate calculations.
 func (n *NinjaBot) preload(ctx context.Context, pair string) error {
 	if n.backtest {
 		return nil
@@ -352,7 +407,10 @@ func (n *NinjaBot) preload(ctx context.Context, pair string) error {
 	return nil
 }
 
-// Run will initialize the strategy controller, order controller, preload data and start the bot
+// Run initializes and starts the trading bot for all configured pairs.
+// It sets up strategy controllers, preloads historical data for indicator warmup,
+// starts data feeds and order processing, and begins the main trading loop.
+// The method supports both backtesting and live trading modes.
 func (n *NinjaBot) Run(ctx context.Context) error {
 	for _, pair := range n.settings.Pairs {
 		// setup and subscribe strategy to data feed (candles)
